@@ -1,8 +1,9 @@
 streamlit==1.29.0
-tensorflow==2.10.1
+tensorflow-cpu==2.10.0  # Lighter version without GPU conflicts
 pandas==1.5.3
-openpyxl==3.1.2
+openpyxl==3.0.10  # More compatible version
 scikit-learn==1.0.2
 matplotlib==3.6.2
 joblib==1.2.0
 protobuf==3.20.3
+numpy==1.23.5  # Pinned to avoid TensorFlow conflicts
