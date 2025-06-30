@@ -1,4 +1,4 @@
-# app.py - Complete Tomato Price Forecasting App
+# app.py - Complete Tomato Price Forecasting App (CSV Version)
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -13,17 +13,23 @@ import streamlit as st
 TARGET_COL = 'Tomato (Round) SZL/1kg'
 SEQ_LENGTH = 60  # Number of days to look back
 FORECAST_DAYS = 30
+DATA_FILE = 'selected_features.csv'  # Changed to CSV
 
 # 2. Data Preparation
 def load_and_prepare_data(file_path):
-    """Load and preprocess the data"""
-    df = pd.read_excel(file_path)
+    """Load and preprocess the data from CSV"""
+    df = pd.read_csv(file_path)  # Changed from read_excel to read_csv
     
     # Automatic date handling
     date_col = None
     if 'Date' in df.columns:
         date_col = pd.to_datetime(df['Date'])
         df = df.drop('Date', axis=1)
+    
+    # Verify target column exists
+    if TARGET_COL not in df.columns:
+        st.error(f"Target column '{TARGET_COL}' not found in dataset")
+        st.stop()
     
     # Extract target variable
     prices = df[TARGET_COL].values.reshape(-1, 1)
@@ -85,12 +91,12 @@ def main():
         
         # Load data
         try:
-            scaled_data, scaler, dates = load_and_prepare_data('selected_features.xlsx')
+            scaled_data, scaler, dates = load_and_prepare_data(DATA_FILE)
             st.success(f"Data loaded successfully! ({len(scaled_data)} records)")
             
             # Show raw data preview
             if st.checkbox("Show raw data"):
-                st.dataframe(pd.read_excel('selected_features.xlsx').head())
+                st.dataframe(pd.read_csv(DATA_FILE).head())  # Changed to read_csv
             
             # Create sequences
             X, y = create_sequences(scaled_data, SEQ_LENGTH)
@@ -132,7 +138,7 @@ def main():
                 # Load artifacts
                 model = load_model('tomato_model.h5')
                 scaler = joblib.load('price_scaler.save')
-                scaled_data, _, dates = load_and_prepare_data('selected_features.xlsx')
+                scaled_data, _, dates = load_and_prepare_data(DATA_FILE)
                 
                 # Get last sequence
                 last_sequence = scaled_data[-SEQ_LENGTH:]
@@ -146,27 +152,28 @@ def main():
                 
                 results = pd.DataFrame({
                     'Date': forecast_dates,
-                    'Forecasted Price': forecast.flatten()
+                    'Forecasted Price (SZL/kg)': forecast.flatten()
                 })
                 
                 # Display results
-                st.dataframe(results.style.format({'Forecasted Price': '{:.2f}'}))
+                st.dataframe(results.style.format({'Forecasted Price (SZL/kg)': '{:.2f}'}))
                 
                 # Plot results
                 fig, ax = plt.subplots(figsize=(12, 6))
-                ax.plot(results['Date'], results['Forecasted Price'], 
+                ax.plot(results['Date'], results['Forecasted Price (SZL/kg)'], 
                         marker='o', linestyle='--', color='red')
                 ax.set_title(f'{FORECAST_DAYS}-Day Tomato Price Forecast')
                 ax.set_xlabel('Date')
-                ax.set_ylabel('Price (SZL/1kg)')
+                ax.set_ylabel('Price (SZL/kg)')
                 ax.grid(True)
                 plt.xticks(rotation=45)
                 st.pyplot(fig)
                 
                 # Download option
+                csv = results.to_csv(index=False)
                 st.download_button(
                     "Download Forecast",
-                    data=results.to_csv(index=False),
+                    data=csv,
                     file_name="tomato_forecast.csv",
                     mime="text/csv"
                 )
