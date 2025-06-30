@@ -15,16 +15,42 @@ SEQ_LENGTH = 60  # Number of days to look back
 FORECAST_DAYS = 30
 DATA_FILE = 'selected_features.csv'
 
-# 2. Data Preparation with Encoding Detection
 def load_and_prepare_data(file_path):
-    """Load and preprocess CSV with automatic encoding detection"""
-    # Try multiple common encodings
-    encodings = ['utf-8', 'latin1', 'ISO-8859-1', 'cp1252']
-    
-    for encoding in encodings:
-        try:
-            df = pd.read_csv(file_path, encoding=encoding)
-            st.success(f"Successfully loaded with {encoding} encoding")
+    """Robust CSV loader that handles formatting issues"""
+    try:
+        # Try reading with flexible parameters
+        df = pd.read_csv(
+            file_path,
+            encoding='utf-8',
+            on_bad_lines='warn',  # Skip bad lines instead of failing
+            quotechar='"',
+            quoting=1,  # QUOTE_MINIMAL
+            error_bad_lines=False  # Deprecated in newer pandas, but works in 1.5.3
+        )
+        
+        # Alternative for newer pandas:
+        # df = pd.read_csv(file_path, encoding='utf-8', on_bad_lines='skip')
+        
+        # If empty, try other encodings
+        if df.empty:
+            for encoding in ['latin1', 'ISO-8859-1', 'cp1252']:
+                try:
+                    df = pd.read_csv(file_path, encoding=encoding, on_bad_lines='warn')
+                    if not df.empty:
+                        break
+                except:
+                    continue
+        
+        # Verify we got data
+        if df.empty:
+            st.error("Failed to load CSV - file may be corrupt")
+            st.markdown("""
+            **Common fixes:**
+            1. Open in Excel and save as 'CSV UTF-8 (Comma delimited)'
+            2. Ensure all lines have the same number of columns
+            3. Check for unquoted commas in text fields
+            """)
+            st.stop()
             
             # Handle date column
             date_col = None
