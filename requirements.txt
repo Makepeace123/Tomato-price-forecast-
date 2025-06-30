@@ -1,9 +1,12 @@
-streamlit==1.29.0
-tensorflow-cpu==2.10.0  # Lighter version without GPU conflicts
+# Core Packages
+numpy==1.23.5  # Critical for TensorFlow compatibility
+tensorflow==2.10.0  # Last stable version for Py3.9
 pandas==1.5.3
-openpyxl==3.0.10  # More compatible version
+openpyxl==3.0.10
+
+# Supporting Packages
 scikit-learn==1.0.2
 matplotlib==3.6.2
 joblib==1.2.0
 protobuf==3.20.3
-numpy==1.23.5  # Pinned to avoid TensorFlow conflicts
+streamlit==1.29.0
