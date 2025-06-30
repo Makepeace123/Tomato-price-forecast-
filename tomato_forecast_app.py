@@ -1,71 +1,53 @@
+# simple_forecast_app.py
 import streamlit as st
 import numpy as np
 import pandas as pd
-from tensorflow.keras.models import load_model
 from datetime import datetime, timedelta
-import pickle  # Alternative to joblib
-import os
-os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'  # Add this line first
 
-import streamlit as st
-import numpy as np
-import pandas as pd
-import joblib
-from datetime import datetime, timedelta
-from tensorflow.keras.models import load_model
-# Cache resources
-@st.cache_resource
-def load_assets():
-    try:
-        model = load_model('tomato_price_model.h5')
-        with open('feature_scaler.pkl', 'rb') as f:
-            feature_scaler = pickle.load(f)
-        with open('target_scaler.pkl', 'rb') as f:
-            target_scaler = pickle.load(f)
-        last_features = np.load('last_features.npy', allow_pickle=True)
-        return model, feature_scaler, target_scaler, last_features
-    except Exception as e:
-        st.error(f"Error loading model: {str(e)}")
-        return None, None, None, None
+# Mock forecasting function (replace with your real model later)
+def mock_forecast(last_price, days=30):
+    """Generate a realistic mock forecast"""
+    base_trend = np.linspace(last_price, last_price * 1.1, days)  # Slight upward trend
+    noise = np.random.normal(0, last_price * 0.02, days)  # 2% daily fluctuations
+    seasonal = np.sin(np.linspace(0, 3*np.pi, days)) * last_price * 0.05  # Seasonal pattern
+    return base_trend + noise + seasonal
 
-model, feature_scaler, target_scaler, last_features = load_assets()
+# App UI
+st.set_page_config(page_title="Tomato Forecast", layout="centered")
+st.title("🍅 Simple Tomato Price Forecast")
 
-if model is None:
-    st.stop()
+# User inputs
+col1, col2 = st.columns(2)
+with col1:
+    last_price = st.number_input("Current price (SZL/kg)", min_value=5.0, max_value=100.0, value=25.74)
+with col2:
+    forecast_days = st.slider("Forecast days", 7, 90, 30)
 
-# Forecast function
-def generate_forecast(input_features, days=30):
-    forecasts = []
-    current = input_features.copy()
-    for _ in range(days):
-        pred = model.predict(current.reshape(1, 1, -1), verbose=0)[0,0]
-        forecasts.append(pred)
-        current[-1] = pred
-    return target_scaler.inverse_transform(np.array(forecasts).reshape(-1, 1))
-
-# Streamlit UI
-st.set_page_config(page_title="Tomato AI", layout="wide")
-st.title('🍅 Tomato Price Forecaster')
-
-if st.button('Generate 30-Day Forecast', type='primary'):
-    with st.spinner('Generating forecast...'):
-        forecast = generate_forecast(last_features)
-        dates = [datetime.now() + timedelta(days=i) for i in range(1, 31)]
-        
-        # Show results
-        st.subheader('Price Forecast')
-        chart_data = pd.DataFrame({
-            'Date': dates,
-            'Price (SZL/kg)': forecast.flatten()
-        }).set_index('Date')
-        st.line_chart(chart_data)
-        
-        # Download button
-        st.download_button(
-            "Download Forecast",
-            chart_data.reset_index().to_csv(index=False),
-            "tomato_forecast.csv"
-        )
+# Generate and display forecast
+if st.button("Generate Forecast"):
+    forecast = mock_forecast(last_price, forecast_days)
+    dates = [datetime.now() + timedelta(days=i) for i in range(forecast_days)]
+    
+    # Create dataframe
+    forecast_df = pd.DataFrame({
+        "Date": dates,
+        "Price": forecast.round(2)
+    }).set_index("Date")
+    
+    # Display
+    st.subheader(f"{forecast_days}-Day Forecast")
+    st.line_chart(forecast_df)
+    
+    # Show data table
+    st.dataframe(forecast_df, height=300)
+    
+    # Download button
+    st.download_button(
+        "Download Forecast",
+        forecast_df.reset_index().to_csv(index=False),
+        f"tomato_forecast_{datetime.now().date()}.csv",
+        "text/csv"
+    )
 
 st.markdown("---")
-st.info("ℹ️ Using your trained LSTM model with last known market conditions")
+st.caption("Note: This demo uses mock data. Replace with your real model for production.")
