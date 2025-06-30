@@ -16,41 +16,76 @@ FORECAST_DAYS = 30
 DATA_FILE = 'selected_features.csv'
 
 def load_and_prepare_data(file_path):
-    """Robust CSV loader that handles formatting issues"""
-    try:
-        # Try reading with flexible parameters
-        df = pd.read_csv(
-            file_path,
-            encoding='utf-8',
-            on_bad_lines='warn',  # Skip bad lines instead of failing
-            quotechar='"',
-            quoting=1,  # QUOTE_MINIMAL
-            error_bad_lines=False  # Deprecated in newer pandas, but works in 1.5.3
-        )
-        
-        # Alternative for newer pandas:
-        # df = pd.read_csv(file_path, encoding='utf-8', on_bad_lines='skip')
-        
-        # If empty, try other encodings
-        if df.empty:
-            for encoding in ['latin1', 'ISO-8859-1', 'cp1252']:
-                try:
-                    df = pd.read_csv(file_path, encoding=encoding, on_bad_lines='warn')
-                    if not df.empty:
-                        break
-                except:
-                    continue
-        
-        # Verify we got data
-        if df.empty:
-            st.error("Failed to load CSV - file may be corrupt")
-            st.markdown("""
-            **Common fixes:**
-            1. Open in Excel and save as 'CSV UTF-8 (Comma delimited)'
-            2. Ensure all lines have the same number of columns
-            3. Check for unquoted commas in text fields
-            """)
-            st.stop()
+    """Robust CSV loader that handles both encoding and formatting issues"""
+    # Try multiple approaches to load the file
+    for attempt in range(3):  # Try up to 3 different methods
+        try:
+            # Attempt 1: Standard read with error skipping
+            if attempt == 0:
+                df = pd.read_csv(
+                    file_path,
+                    encoding='utf-8',
+                    on_bad_lines='skip',
+                    engine='python'  # More flexible parser
+                )
+            
+            # Attempt 2: Try different encodings
+            elif attempt == 1:
+                for encoding in ['latin1', 'ISO-8859-1', 'cp1252']:
+                    try:
+                        df = pd.read_csv(
+                            file_path,
+                            encoding=encoding,
+                            on_bad_lines='skip',
+                            engine='python'
+                        )
+                        if not df.empty:
+                            break
+                    except:
+                        continue
+            
+            # Attempt 3: Manual line-by-line parsing
+            else:
+                from io import StringIO
+                good_lines = []
+                with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                    for line in f:
+                        if line.count(',') == len(df.columns) - 1:  # Match expected columns
+                            good_lines.append(line)
+                df = pd.read_csv(StringIO('\n'.join(good_lines)))
+            
+            # Validate we got data
+            if df.empty:
+                continue
+                
+            # Process data
+            date_col = None
+            if 'Date' in df.columns:
+                date_col = pd.to_datetime(df['Date'])
+                df = df.drop('Date', axis=1)
+            
+            if TARGET_COL not in df.columns:
+                available_cols = list(df.columns)
+                st.error(f"Target column '{TARGET_COL}' not found. Available: {available_cols}")
+                st.stop()
+            
+            prices = df[TARGET_COL].values.reshape(-1, 1)
+            scaler = MinMaxScaler(feature_range=(0, 1))
+            scaled_prices = scaler.fit_transform(prices)
+            
+            return scaled_prices, scaler, date_col
+            
+        except Exception as e:
+            if attempt == 2:  # Final attempt failed
+                st.error(f"Failed to load CSV after 3 attempts. Last error: {str(e)}")
+                st.markdown("""
+                **Solutions:**
+                1. Re-save your CSV in Excel as 'CSV UTF-8 (Comma delimited)'
+                2. Ensure all rows have the same number of columns
+                3. Remove any commas within text fields
+                """)
+                st.stop()
+            continue
             
             # Handle date column
             date_col = None
