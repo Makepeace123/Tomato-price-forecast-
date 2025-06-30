@@ -4,7 +4,15 @@ import pandas as pd
 from tensorflow.keras.models import load_model
 from datetime import datetime, timedelta
 import pickle  # Alternative to joblib
+import os
+os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'  # Add this line first
 
+import streamlit as st
+import numpy as np
+import pandas as pd
+import joblib
+from datetime import datetime, timedelta
+from tensorflow.keras.models import load_model
 # Cache resources
 @st.cache_resource
 def load_assets():
