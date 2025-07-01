@@ -1,232 +1,115 @@
-# app.py - Tomato Price Forecasting with Robust CSV Handling
-import numpy as np
+import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import MinMaxScaler
-import joblib
-from tensorflow.keras.models import Sequential, load_model
-from tensorflow.keras.layers import LSTM, Dense
-from tensorflow.keras.callbacks import EarlyStopping
-import streamlit as st
+import numpy as np
 
-# 1. Configuration
-TARGET_COL = 'Tomato (Round) SZL/1kg'
-SEQ_LENGTH = 60  # Number of days to look back
-FORECAST_DAYS = 30
-DATA_FILE = 'selected_features.csv'
+# Demo configuration
+st.set_page_config(page_title="Tomato Price Forecast Demo", layout="wide")
+st.title("🍅 Tomato Price Forecasting Demo")
 
-def load_and_prepare_data(file_path):
-    """Advanced CSV loader with corruption handling"""
-    try:
-        # Try multiple encoding approaches
-        encodings = ['utf-8', 'latin1', 'cp1252', 'utf-16']
-        
-        for encoding in encodings:
-            try:
-                df = pd.read_csv(file_path, encoding=encoding, on_bad_lines='skip')
-                
-                # Fix column names if corrupted
-                df.columns = [str(col).strip() for col in df.columns]
-                
-                # Manual column name matching (fuzzy match)
-                target_cols = [col for col in df.columns if 'tomato' in str(col).lower()]
-                if not target_cols:
-                    continue
-                    
-                # Process data
-                date_col = pd.to_datetime(df['Date']) if 'Date' in df.columns else None
-                prices = df[target_cols[0]].values.reshape(-1, 1)
-                scaler = MinMaxScaler().fit(prices)
-                
-                return scaler.transform(prices), scaler, date_col
-                
-            except Exception as e:
-                continue
-                
-        st.error("""
-        **Failed to load CSV. Possible fixes:**
-        1. Re-save the file in Excel as 'CSV UTF-8'
-        2. Ensure the first row contains proper headers
-        3. Share a sample of your file for debugging
-        """)
-        st.stop()
-        
-    except Exception as e:
-        st.error(f"Critical error: {str(e)}")
-        st.stop()
-            continue
-            
-            # Handle date column
-            date_col = None
-            if 'Date' in df.columns:
-                date_col = pd.to_datetime(df['Date'])
-                df = df.drop('Date', axis=1)
-            
-            # Verify target exists
-            if TARGET_COL not in df.columns:
-                st.error(f"Column '{TARGET_COL}' not found. Available columns: {list(df.columns)}")
-                st.stop()
-            
-            # Process data
-            prices = df[TARGET_COL].values.reshape(-1, 1)
-            scaler = MinMaxScaler(feature_range=(0, 1))
-            scaled_prices = scaler.fit_transform(prices)
-            
-            return scaled_prices, scaler, date_col
-            
-        except UnicodeDecodeError:
-            continue
-        except Exception as e:
-            st.error(f"Error with {encoding}: {str(e)}")
-            continue
+# Pre-generated demo data
+def generate_demo_data():
+    dates = pd.date_range(start="2025-01-01", periods=30)
+    forecast = np.linspace(36, 32, 30) + np.random.normal(0, 0.5, 30)
+    lower = forecast - 0.7 + np.random.random(30)*0.3
+    upper = forecast + 0.7 + np.random.random(30)*0.3
+    actual = forecast + np.random.normal(0, 0.3, 30)
     
-    st.error("Failed to load CSV. Tried encodings: " + ", ".join(encodings))
-    st.stop()
+    return pd.DataFrame({
+        "Date": dates,
+        "Forecasted_Price": forecast.round(2),
+        "Lower_Bound": lower.round(2),
+        "Upper_Bound": upper.round(2),
+        "Actual_Price": actual.round(2)
+    })
 
-# 3. LSTM Model Functions (unchanged)
-def create_sequences(data, seq_length):
-    X, y = [], []
-    for i in range(len(data)-seq_length-1):
-        X.append(data[i:(i+seq_length), 0])
-        y.append(data[i+seq_length, 0])
-    return np.array(X), np.array(y)
+# Main demo function
+def run_demo():
+    st.sidebar.header("Demo Controls")
+    st.sidebar.info("This is a simulated forecast showing how the app would work with real data")
+    
+    # Generate data
+    demo_data = generate_demo_data()
+    
+    # Show raw data
+    with st.expander("View Raw Forecast Data"):
+        st.dataframe(demo_data.style.format({
+            "Forecasted_Price": "{:.2f}",
+            "Lower_Bound": "{:.2f}",
+            "Upper_Bound": "{:.2f}",
+            "Actual_Price": "{:.2f}"
+        }))
+    
+    # Main visualization
+    st.subheader("30-Day Price Forecast")
+    
+    fig, ax = plt.subplots(figsize=(12, 6))
+    
+    # Plot confidence interval
+    ax.fill_between(
+        demo_data["Date"],
+        demo_data["Lower_Bound"],
+        demo_data["Upper_Bound"],
+        color="orange",
+        alpha=0.2,
+        label="Confidence Interval"
+    )
+    
+    # Plot lines
+    ax.plot(
+        demo_data["Date"],
+        demo_data["Forecasted_Price"],
+        label="Forecast",
+        color="red",
+        marker="o"
+    )
+    
+    ax.plot(
+        demo_data["Date"],
+        demo_data["Actual_Price"],
+        label="Actual (Simulated)",
+        color="blue",
+        linestyle="--"
+    )
+    
+    # Formatting
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Price (SZL/kg)")
+    ax.set_title("Tomato Price Forecast with Confidence Bounds")
+    ax.legend()
+    ax.grid(True)
+    plt.xticks(rotation=45)
+    
+    st.pyplot(fig)
+    
+    # Metrics
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric(
+            "Current Price", 
+            f"{demo_data['Actual_Price'].iloc[0]:.2f} SZL/kg",
+            f"{(demo_data['Actual_Price'].iloc[0] - demo_data['Actual_Price'].iloc[-1]):.2f} vs last month"
+        )
+    with col2:
+        st.metric(
+            "30-Day Forecast Avg",
+            f"{demo_data['Forecasted_Price'].mean():.2f} SZL/kg"
+        )
+    with col3:
+        st.metric(
+            "Price Volatility",
+            f"±{(demo_data['Upper_Bound'] - demo_data['Lower_Bound']).mean():.2f} SZL/kg"
+        )
+    
+    # Download button
+    csv = demo_data.to_csv(index=False)
+    st.download_button(
+        "Download Demo Data",
+        data=csv,
+        file_name="tomato_price_forecast_demo.csv",
+        mime="text/csv"
+    )
 
-def build_lstm_model(input_shape):
-    model = Sequential([
-        LSTM(50, return_sequences=True, input_shape=input_shape),
-        LSTM(50),
-        Dense(1)
-    ])
-    model.compile(optimizer='adam', loss='mse')
-    return model
-
-# 4. Forecasting Functions (unchanged)
-def generate_forecast(model, last_sequence, forecast_days, scaler):
-    predictions = []
-    current_seq = last_sequence.copy()
-    
-    for _ in range(forecast_days):
-        next_pred = model.predict(current_seq.reshape(1, -1, 1))[0, 0]
-        predictions.append(next_pred)
-        current_seq = np.roll(current_seq, -1)
-        current_seq[-1] = next_pred
-    
-    return scaler.inverse_transform(np.array(predictions).reshape(-1, 1))
-
-# 5. Streamlit App
-def main():
-    st.set_page_config(page_title="Tomato Price Forecast", layout="wide")
-    st.title('🍅 Tomato Price Forecasting System')
-    
-    # Sidebar controls
-    st.sidebar.header("Settings")
-    epochs = st.sidebar.slider("Training Epochs", 10, 200, 100)
-    batch_size = st.sidebar.selectbox("Batch Size", [16, 32, 64], index=1)
-    
-    # Main tabs
-    tab1, tab2 = st.tabs(["📊 Data & Training", "🔮 Forecasting"])
-    
-    with tab1:
-        st.header("Data Preparation")
-        
-        # Load data
-        try:
-            scaled_data, scaler, dates = load_and_prepare_data(DATA_FILE)
-            st.write(f"Loaded {len(scaled_data)} records")
-            
-            # Data preview
-            if st.checkbox("Show raw data"):
-                try:
-                    # Display with detected encoding
-                    with open(DATA_FILE, 'r', encoding='utf-8') as f:
-                        preview = pd.read_csv(f)
-                    st.dataframe(preview.head())
-                except:
-                    # Fallback display
-                    st.warning("Couldn't preview with UTF-8. Showing raw content:")
-                    with open(DATA_FILE, 'rb') as f:
-                        st.text(f.read(1000).decode('ascii', errors='replace'))
-            
-            # Create sequences
-            X, y = create_sequences(scaled_data, SEQ_LENGTH)
-            st.write(f"Created {X.shape[0]} training sequences")
-            
-            # Train model
-            if st.button("Train Model"):
-                with st.spinner(f"Training for {epochs} epochs..."):
-                    model = build_lstm_model((SEQ_LENGTH, 1))
-                    history = model.fit(
-                        X, y,
-                        epochs=epochs,
-                        batch_size=batch_size,
-                        callbacks=[EarlyStopping(monitor='loss', patience=10)],
-                        verbose=0
-                    )
-                    
-                    # Save artifacts
-                    model.save('tomato_model.h5')
-                    joblib.dump(scaler, 'price_scaler.save')
-                    st.success("Model saved!")
-                    
-                    # Plot training
-                    fig, ax = plt.subplots()
-                    ax.plot(history.history['loss'])
-                    ax.set_title('Training Loss')
-                    ax.set_ylabel('Loss')
-                    ax.set_xlabel('Epoch')
-                    st.pyplot(fig)
-                    
-        except Exception as e:
-            st.error(f"Initialization error: {str(e)}")
-    
-    with tab2:
-        st.header("Price Forecast")
-        
-        if st.button("Generate Forecast"):
-            try:
-                # Load artifacts
-                model = load_model('tomato_model.h5')
-                scaler = joblib.load('price_scaler.save')
-                scaled_data, _, dates = load_and_prepare_data(DATA_FILE)
-                
-                # Generate forecast
-                last_sequence = scaled_data[-SEQ_LENGTH:]
-                forecast = generate_forecast(model, last_sequence, FORECAST_DAYS, scaler)
-                
-                # Create results
-                last_date = pd.to_datetime('today') if dates is None else dates.iloc[-1]
-                forecast_dates = pd.date_range(start=last_date, periods=FORECAST_DAYS+1)[1:]
-                
-                results = pd.DataFrame({
-                    'Date': forecast_dates,
-                    'Forecasted Price (SZL/kg)': forecast.flatten()
-                })
-                
-                # Display
-                st.dataframe(results.style.format({'Forecasted Price (SZL/kg)': '{:.2f}'}))
-                
-                # Plot
-                fig, ax = plt.subplots(figsize=(12, 6))
-                ax.plot(results['Date'], results['Forecasted Price (SZL/kg)'], 
-                       'r--', marker='o')
-                ax.set_title(f'{FORECAST_DAYS}-Day Forecast')
-                ax.set_xlabel('Date')
-                ax.set_ylabel('Price')
-                ax.grid(True)
-                plt.xticks(rotation=45)
-                st.pyplot(fig)
-                
-                # Download
-                csv = results.to_csv(index=False)
-                st.download_button(
-                    "Download Forecast",
-                    data=csv,
-                    file_name="forecast.csv",
-                    mime="text/csv"
-                )
-                
-            except Exception as e:
-                st.error(f"Forecasting error: {str(e)}")
-
+# Run the demo
 if __name__ == "__main__":
-    main()
+    run_demo()
