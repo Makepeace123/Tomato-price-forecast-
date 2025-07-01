@@ -16,75 +16,44 @@ FORECAST_DAYS = 30
 DATA_FILE = 'selected_features.csv'
 
 def load_and_prepare_data(file_path):
-    """Robust CSV loader that handles both encoding and formatting issues"""
-    # Try multiple approaches to load the file
-    for attempt in range(3):  # Try up to 3 different methods
-        try:
-            # Attempt 1: Standard read with error skipping
-            if attempt == 0:
-                df = pd.read_csv(
-                    file_path,
-                    encoding='utf-8',
-                    on_bad_lines='skip',
-                    engine='python'  # More flexible parser
-                )
-            
-            # Attempt 2: Try different encodings
-            elif attempt == 1:
-                for encoding in ['latin1', 'ISO-8859-1', 'cp1252']:
-                    try:
-                        df = pd.read_csv(
-                            file_path,
-                            encoding=encoding,
-                            on_bad_lines='skip',
-                            engine='python'
-                        )
-                        if not df.empty:
-                            break
-                    except:
-                        continue
-            
-            # Attempt 3: Manual line-by-line parsing
-            else:
-                from io import StringIO
-                good_lines = []
-                with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
-                    for line in f:
-                        if line.count(',') == len(df.columns) - 1:  # Match expected columns
-                            good_lines.append(line)
-                df = pd.read_csv(StringIO('\n'.join(good_lines)))
-            
-            # Validate we got data
-            if df.empty:
+    """Advanced CSV loader with corruption handling"""
+    try:
+        # Try multiple encoding approaches
+        encodings = ['utf-8', 'latin1', 'cp1252', 'utf-16']
+        
+        for encoding in encodings:
+            try:
+                df = pd.read_csv(file_path, encoding=encoding, on_bad_lines='skip')
+                
+                # Fix column names if corrupted
+                df.columns = [str(col).strip() for col in df.columns]
+                
+                # Manual column name matching (fuzzy match)
+                target_cols = [col for col in df.columns if 'tomato' in str(col).lower()]
+                if not target_cols:
+                    continue
+                    
+                # Process data
+                date_col = pd.to_datetime(df['Date']) if 'Date' in df.columns else None
+                prices = df[target_cols[0]].values.reshape(-1, 1)
+                scaler = MinMaxScaler().fit(prices)
+                
+                return scaler.transform(prices), scaler, date_col
+                
+            except Exception as e:
                 continue
                 
-            # Process data
-            date_col = None
-            if 'Date' in df.columns:
-                date_col = pd.to_datetime(df['Date'])
-                df = df.drop('Date', axis=1)
-            
-            if TARGET_COL not in df.columns:
-                available_cols = list(df.columns)
-                st.error(f"Target column '{TARGET_COL}' not found. Available: {available_cols}")
-                st.stop()
-            
-            prices = df[TARGET_COL].values.reshape(-1, 1)
-            scaler = MinMaxScaler(feature_range=(0, 1))
-            scaled_prices = scaler.fit_transform(prices)
-            
-            return scaled_prices, scaler, date_col
-            
-        except Exception as e:
-            if attempt == 2:  # Final attempt failed
-                st.error(f"Failed to load CSV after 3 attempts. Last error: {str(e)}")
-                st.markdown("""
-                **Solutions:**
-                1. Re-save your CSV in Excel as 'CSV UTF-8 (Comma delimited)'
-                2. Ensure all rows have the same number of columns
-                3. Remove any commas within text fields
-                """)
-                st.stop()
+        st.error("""
+        **Failed to load CSV. Possible fixes:**
+        1. Re-save the file in Excel as 'CSV UTF-8'
+        2. Ensure the first row contains proper headers
+        3. Share a sample of your file for debugging
+        """)
+        st.stop()
+        
+    except Exception as e:
+        st.error(f"Critical error: {str(e)}")
+        st.stop()
             continue
             
             # Handle date column
