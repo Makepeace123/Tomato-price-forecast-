@@ -2,6 +2,43 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import threading
+import time
+import requests
+import os
+
+# =============================================
+# ADD THIS TO ANY STREAMLIT APP (BEGINNING)
+# =============================================
+def keep_alive():
+    """Background thread to ping the app"""
+    while True:
+        try:
+            app_url = os.getenv('STREAMLIT_SERVER_BASE_URL', 'http://localhost:8501')
+            requests.get(f"{app_url}/?keepalive=1", timeout=5)
+            time.sleep(240)  # Ping every 4 minutes
+        except:
+            time.sleep(60)
+
+if not hasattr(st.session_state, 'keep_alive_started'):
+    t = threading.Thread(target=keep_alive, daemon=True)
+    t.start()
+    st.session_state.keep_alive_started = True
+
+# Client-side refresh (add this where you initialize your app)
+st.markdown("""
+<script>
+setTimeout(function(){ location.reload(); }, 5*60*1000);  // Refresh every 5 minutes
+</script>
+""", unsafe_allow_html=True)
+
+# Handle keep-alive ping (add this early in main logic)
+if st.query_params.get('keepalive'):
+    st.write("")  # Empty response
+    st.stop()
+# =============================================
+# END OF UNIVERSAL KEEP-ALIVE CODE
+# =============================================
 
 # Demo configuration
 st.set_page_config(page_title="Tomato Price Forecast Demo", layout="wide")
