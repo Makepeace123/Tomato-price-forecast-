@@ -8,10 +8,10 @@ import requests
 import os
 
 # =============================================
-# ADD THIS TO ANY STREAMLIT APP (BEGINNING)
+# UNIVERSAL KEEP-ALIVE SYSTEM
 # =============================================
 def keep_alive():
-    """Background thread to ping the app"""
+    """Background thread to prevent app sleeping"""
     while True:
         try:
             app_url = os.getenv('STREAMLIT_SERVER_BASE_URL', 'http://localhost:8501')
@@ -25,19 +25,17 @@ if not hasattr(st.session_state, 'keep_alive_started'):
     t.start()
     st.session_state.keep_alive_started = True
 
-# Client-side refresh (add this where you initialize your app)
+# Handle keep-alive ping
+if st.query_params.get('keepalive'):
+    st.write("")  # Empty response
+    st.stop()
+
+# Client-side auto-refresh
 st.markdown("""
 <script>
 setTimeout(function(){ location.reload(); }, 5*60*1000);  // Refresh every 5 minutes
 </script>
 """, unsafe_allow_html=True)
-
-# Handle keep-alive ping (add this early in main logic)
-if st.query_params.get('keepalive'):
-    st.write("")  # Empty response
-    st.stop()
-# =============================================
-# END OF UNIVERSAL KEEP-ALIVE CODE
 # =============================================
 
 # Demo configuration
