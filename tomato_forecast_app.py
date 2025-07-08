@@ -7,8 +7,11 @@ import time
 import requests
 import os
 
+# Demo configuration
+st.set_page_config(page_title="Tomato Price Forecast Demo", layout="wide")
+
 # =============================================
-# UNIVERSAL KEEP-ALIVE SYSTEM
+# MODIFIED KEEP-ALIVE SYSTEM (SAFE VERSION)
 # =============================================
 def keep_alive():
     """Background thread to prevent app sleeping"""
@@ -20,26 +23,24 @@ def keep_alive():
         except:
             time.sleep(60)
 
-if not hasattr(st.session_state, 'keep_alive_started'):
+if 'keep_alive_started' not in st.session_state:
+    st.session_state.keep_alive_started = True
     t = threading.Thread(target=keep_alive, daemon=True)
     t.start()
-    st.session_state.keep_alive_started = True
 
-# Handle keep-alive ping
-if st.query_params.get('keepalive'):
+# Check for keepalive ping AFTER Streamlit is initialized
+if 'query_params' in dir(st) and st.query_params.get('keepalive'):
     st.write("")  # Empty response
     st.stop()
 
 # Client-side auto-refresh
-st.markdown("""
+components.html("""
 <script>
-setTimeout(function(){ location.reload(); }, 5*60*1000);  // Refresh every 5 minutes
+setTimeout(function(){ location.reload(); }, 5*60*1000);
 </script>
-""", unsafe_allow_html=True)
+""", height=0, width=0)
 # =============================================
 
-# Demo configuration
-st.set_page_config(page_title="Tomato Price Forecast Demo", layout="wide")
 st.title("🍅 Tomato Price Forecasting Demo")
 
 # Pre-generated demo data
