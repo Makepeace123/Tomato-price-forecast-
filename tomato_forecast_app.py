@@ -1,4 +1,5 @@
 import streamlit as st
+from streamlit.components.v1 import html
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,7 +12,7 @@ import os
 st.set_page_config(page_title="Tomato Price Forecast Demo", layout="wide")
 
 # =============================================
-# MODIFIED KEEP-ALIVE SYSTEM (SAFE VERSION)
+# MODIFIED KEEP-ALIVE SYSTEM (FULLY WORKING VERSION)
 # =============================================
 def keep_alive():
     """Background thread to prevent app sleeping"""
@@ -29,12 +30,12 @@ if 'keep_alive_started' not in st.session_state:
     t.start()
 
 # Check for keepalive ping AFTER Streamlit is initialized
-if 'query_params' in dir(st) and st.query_params.get('keepalive'):
+if hasattr(st, 'query_params') and st.query_params.get('keepalive'):
     st.write("")  # Empty response
     st.stop()
 
 # Client-side auto-refresh
-components.html("""
+html("""
 <script>
 setTimeout(function(){ location.reload(); }, 5*60*1000);
 </script>
